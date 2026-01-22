@@ -101,6 +101,9 @@ app.use((req, res, next) => {
 });
 
 // ------------------- ROUTES -------------------
+app.get("/", (req, res) => {
+    res.redirect("/listings");
+});
 app.use("/listings", listingRouter);
 app.use("/listings/:id/reviews", reviewRouter);
 app.use("/", userRouter);
@@ -112,7 +115,7 @@ app.use((req, res, next) => {
 });
 
 // Centralized Error Middleware
-app.use((err, req, res) => {
+app.use((err, req, res, next) => {
     const { statusCode = 500, message = "Something went wrong" } = err;
     res.status(statusCode).render("error.ejs", { message });
 });
