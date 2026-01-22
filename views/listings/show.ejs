@@ -10,11 +10,7 @@
   <div class="card col-6 offset-3 show-card listing-card">
     <img src="<%= listing.image.url %>" alt="listing_image" class="card-img-top">
     <div class="card-body">
-      <% if (currUser) { %>
-        <p class="card-text"><i>Owner: <%= currUser.username %> </i></p>
-      <% } else { %>
-        <p class="card-text"><i>Owner: N/A</i></p>
-      <% } %>
+      <p class="card-text"><i>Owned by: <%= listing.owner.username %> </i></p>
       <p class="card-text"> <%= listing.description %></p> 
       <p class="card-text">&#8377 <%= listing.price ? listing.price.toLocaleString("en-IN") : "N/A" %></p> 
       <p class="card-text"> <%= listing.location %></p> 

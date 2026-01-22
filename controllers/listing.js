@@ -100,42 +100,61 @@ module.exports.showListing = async (req, res) => {
 // ------------------- CREATE LISTING: Save New Listing to Database -------------------
 module.exports.createListing = async (req, res, next) => {
   try {
-    // Get image URL and filename from the uploaded file (via Multer)
-    const url = req.file?.path;
-    const filename = req.file?.filename;
-
     // Create a new listing object using data from the request body
-    const newListing = new Listing(req.body.listing);
+    const listingData = req.body.listing;
+    // Remove the image field from listingData if it's a string (empty or otherwise)
+    // because we will set it properly from req.file or use defaults
+    if (typeof listingData.image === "string") {
+      delete listingData.image;
+    }
+    const newListing = new Listing(listingData);
+    
+    // Set the owner of the new listing to the currently logged-in user
+    newListing.owner = req.user._id;
+
+    // Get image URL and filename from the uploaded file (via Multer)
+    if (typeof req.file !== "undefined") {
+      const url = req.file.path;
+      const filename = req.file.filename;
+      newListing.image = { url, filename };
+    }
 
     // ✅ Get coordinates from location text using geocoding
     const locationQuery = req.body.listing.location;
     if (locationQuery) {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locationQuery)}&format=json&limit=1`
-      );
-      const data = await response.json();
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(locationQuery)}&format=json&limit=1`,
+          {
+            headers: {
+              'User-Agent': 'MajorProject-Wanderlust'
+            }
+          }
+        );
+        const data = await response.json();
 
-      if (data.length > 0) {
-        const lat = parseFloat(data[0].lat);
-        const lon = parseFloat(data[0].lon);
-        newListing.geometry = {
-          type: "Point",
-          coordinates: [lon, lat],
-        };
-      } else {
+        if (data.length > 0) {
+          const lat = parseFloat(data[0].lat);
+          const lon = parseFloat(data[0].lon);
+          newListing.geometry = {
+            type: "Point",
+            coordinates: [lon, lat],
+          };
+        } else {
+          // Fallback to Delhi coordinates if geocoding fails
+          newListing.geometry = {
+            type: "Point",
+            coordinates: [77.209, 28.6139], // Delhi fallback
+          };
+        }
+      } catch (geoErr) {
+        console.error("Geocoding error:", geoErr);
         // Fallback to Delhi coordinates if geocoding fails
         newListing.geometry = {
           type: "Point",
-          coordinates: [77.209, 28.6139], // Delhi fallback
+          coordinates: [77.209, 28.6139], 
         };
       }
-    }
-
-    // Set the owner of the new listing to the currently logged-in user
-    newListing.owner = req.user._id;
-    // Add image details if an image was uploaded
-    if (url && filename) {
-      newListing.image = { url, filename };
     }
 
     // Save the new listing document to the database
@@ -144,7 +163,7 @@ module.exports.createListing = async (req, res, next) => {
     res.redirect("/listings");
   } catch (err) {
     console.error("Error creating listing:", err);
-    req.flash("error", "Failed to create listing!");
+    req.flash("error", "Failed to create listing! " + err.message);
     res.redirect("/listings/new");
   }
 };
@@ -178,10 +197,16 @@ module.exports.updateListing = async (req, res) => {
     }
 
     const oldLocation = listing.location;
-    const newLocation = req.body.listing.location;
+    const newListingData = req.body.listing;
+    
+    // Remove the image field from newListingData if it's a string
+    if (typeof newListingData.image === "string") {
+      delete newListingData.image;
+    }
+    const newLocation = newListingData.location;
 
     // Update basic listing fields from the form data
-    listing = await Listing.findByIdAndUpdate(id, { ...req.body.listing }, { new: true });
+    listing = await Listing.findByIdAndUpdate(id, { ...newListingData }, { new: true });
 
     // ✅ Update image details if a new image file was uploaded
     if (req.file) {
